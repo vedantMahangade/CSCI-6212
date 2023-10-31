@@ -1,95 +1,78 @@
 import time
 import random
-# Generates a list of n number of client machines.
-def generate_client_machine_list(n,k):
-    client_machines = []
-    i = 0
-    for i in range(0, n):
-        client_machines.append(random.randint(1, 100))
-    server_locations = [] #remove when we find real server locations
-    j = 0; step_size=int(n/k) #remove when we find real server locations
-    for j in range(int(step_size/2),n,step_size): #remove when we find real server locations
-        server_locations.append(j) #remove when we find real server locations
-    return client_machines,server_locations
+import math
 
-# calculate traffic according to current server position state
-def calculate_traffic_and_labels(client_machine_weights,server_locations):
-    total_traffic = 0
-    all_label = []
-    try: 
-        server_locations += 0
-    except TypeError:
-        #print('type error so loop through multiple servers')
-        for i in range(0,len(client_machine_weights)):
-            dist_from_all_servers = [abs(server - i) for server in server_locations]
-            ith_label=dist_from_all_servers.index(min(dist_from_all_servers))
-            all_label.append(ith_label)
-            total_traffic += dist_from_all_servers[ith_label]*client_machine_weights[i]
-    else:
-        #print('no typeerror, only one server')
-        for i in range(0,len(client_machine_weights)):
-            dist_from_all_server = abs(server_locations - i)
-            total_traffic += dist_from_all_server*client_machine_weights[i]
-    return total_traffic,all_label
+# Cost of placing server at median 
+# establishing Base Case
+def placeOneServer(trafficWeights, i, j):
+    totalWeight = 0
+    for x in range(i, j+1):
+        totalWeight += trafficWeights[x-1]
+  
+    half_sum = totalWeight // 2
+    server_pos = i
+  
+    accumulatedWeight = 0
+    for x in range(i, j+1):
+        accumulatedWeight += trafficWeights[x-1]
+        if accumulatedWeight >= half_sum:
+            server_pos = x
+            break 
 
-def move_servers(client_machine_weights,all_label):
-    j=0
-    server_locations = []
-    for i in range(0,max(all_label)+1):
-        temp_traffic = float('inf')
-        #print('Reset traffic to: ', temp_traffic)
-        temp_weights = []
-        startj = j
-        while all_label[j] == i:
-            #print(client_machine_weights[j])
-            temp_weights.append(client_machine_weights[j])
-            j += 1
-            if j == len(client_machine_weights):
-                break
-        #print('temp weights',temp_weights)
-        for k in range(0,j-startj):
-            #print('temppweights:',temp_weights,'and k', k)
-            temptraffic = calculate_traffic_and_labels(temp_weights,k)[0]
-            #print('temptraffic',temptraffic, 'for group', i)
-            if temptraffic <= temp_traffic:
-                #print('Current traffic:', temp_traffic, 'and current server: ', k)
-                #print('New traffic', temptraffic, 'and new server', k)
-                #print('___')
-                append_server_pos = startj + k
-                temp_traffic = temptraffic
-        #print('testing', append_server_pos)
-        server_locations.append(append_server_pos)
-    return server_locations
+    return sum(trafficWeights[x-1] * abs(server_pos-x) for x in range(i, j+1))
+      
 
-def run_iterations(list_of_client_machines,old_labels):
-    # Start time (in ns) of when the function to implement runs.
+
+def findOptimalServerPositions(trafficWeights, clients, k):
+
+    # create a dynamic table of size (n x n x k)
+    dp = [[[float("inf") for _ in range(k+1)] for _ in range(clients+1)] for _ in range(clients+1)]
+
+    # Bottom up DP 
+    # Initialize dp table
+    for i in range(clients+1):
+        for j in range(clients+1):
+            dp[i][i][1] = 0         # initialize to 0 as total cost with one server and one client will be 0
+            dp[i][j][0] = float("inf")  # initialize to infinity as total cost with no servers will be 0
+            
     start = time.perf_counter_ns()
-    for i in range(0,1000):
-        new_servers = move_servers(list_of_client_machines,old_labels)
-        tot_traffic,new_labels = calculate_traffic_and_labels(list_of_client_machines,new_servers)
-        if old_labels == new_labels:
-            break
-        else:
-            old_labels = new_labels
-        print("New traffic: ", tot_traffic, " --- Current iteration: ", i, " --- New server locations: ", new_servers) 
-    # End time (in ns) of when the function to implement runs.
+    # Fill dp table   
+    for m in range(1, k+1):
+        for i in range(1, clients+1):
+            for j in range(i, clients+1):
+                for x in range(i, j-1):
+                    c = dp[i][x][m-1] + placeOneServer(trafficWeights,x+1, j)
+                    dp[i][j][m] = min(dp[i][j][m], c) # Update dp table
+
     end = time.perf_counter_ns()
-    return end-start
+    time_ = end-start 
+    # Minimum cost
+    # print(dp[1][clients][k])
+    return time_,dp[1][clients][k]
 
+
+# driver code
 if __name__ == "__main__":
-    # Gives the user the option to enter how many list sizes they want.
-    n_list = int(1000)#int(input("Enter number of client machines: "))
+    
+    # n = 30
+    # trafficWeights = [34,47,45,20,11,24,37,30,81,73,99,30,21,52,51,41,60,63,96,67,69,5,92,66,44,47,99,21,47,56]
+    #                 # [75, 70, 25, 42, 53, 3]
+    #                 # [1,4,2,3,7,5]
+    #                 # [10, 90, 50, 100, 207, 90, 46, 70]
 
-    # Gives user the option to enter k number of servers to implement
-    k_list= int(12)#int(input("Enter number of servers: "))
-    # Generates n number of client machines
-    list_of_client_machines,list_of_server_locations = generate_client_machine_list(n=n_list,k=k_list)
-    tot_traffic,old_labels = calculate_traffic_and_labels(list_of_client_machines,list_of_server_locations)
-    print('initial servers', list_of_server_locations)
-    print('initial_traffic', tot_traffic)
-    #print(list_of_client_machines)
-    #new_servers = move_servers(list_of_client_machines,old_labels)
-    #new_traffic,new_labels = calculate_traffic_and_labels(list_of_client_machines,new_servers)
-    #print('new_servers', new_servers)
-    #print('new traffic', new_traffic)
-    time_ = run_iterations(list_of_client_machines,old_labels)
+    # k = 10
+    k = 4
+    inc = 0.5
+    counter = 0.25
+    for n in range (10,50):
+        w = [random.randint(1,100) for _ in range(0,n)]
+        # Start time (in ns) of when the function to implement runs.
+        
+
+        time_, optimalPositions = findOptimalServerPositions(w, n, math.floor(k))
+
+        # End time (in ns) of when the function to implement runs.
+        
+        print(n,"\t\t\t",math.floor(k),"\t\t\t",time_)
+        k = k + 0.3
+
