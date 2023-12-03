@@ -3,7 +3,8 @@ import sys
 import time
 
 #Initialize employee-job matrix
-time_elapsed = np.zeros((1, 100))
+time_elapsed_bnb = np.zeros((1, 100))
+time_elapsed_greedy = np.zeros((1, 100))
 
 def calculate_total_payment(assignment, costs):
     # Initialize total payment
@@ -42,6 +43,29 @@ def solve_generalized_assignment(costs):
     branch_and_bound([], costs, 0, n, best_solution)
     return best_solution[1]
 
+
+def find_minCostJob(costs, remainingJobs):
+    minCost = costs[remainingJobs[0]]
+    i=remainingJobs[0]
+    for job in remainingJobs:
+        if costs[job] < minCost:
+            minC = costs[job]
+            i=job
+    return i
+
+
+def solve_GAP_greedy(costs):
+    m, n = costs.shape # m people, n jobs
+    greedy_solution = m*[0]  # [best assignment]
+    jobs = list(range(0,n))
+    for i in range(0, n):
+        costsi = costs[i]
+        minCostJob = find_minCostJob(costsi, jobs)
+        greedy_solution[i] = minCostJob
+        jobs.remove(minCostJob)
+    return greedy_solution
+
+
 for i in range(1,100):
     m = i  # Number of people and jobs
     costs = np.random.randint(1, 100, size=(m, m))  # Random costs for each assignment
@@ -50,5 +74,11 @@ for i in range(1,100):
     #print(costs)
     #print("Best assignment:", best_assignment)
     end = time.perf_counter_ns()
-    time_elapsed[0, i] = end-start
-print(time_elapsed)
+    time_elapsed_bnb[0, i] = end-start
+
+    start = time.perf_counter_ns()
+    best_assignment_greedy = solve_GAP_greedy(costs)
+    end = time.perf_counter_ns()
+    time_elapsed_greedy[0, i] = end-start
+
+print(time_elapsed_bnb, time_elapsed_greedy)
